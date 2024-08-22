@@ -1,7 +1,10 @@
 from flask import Flask, render_template, request, session, redirect, url_for, jsonify, send_from_directory
-from runnables import CrisisRunnable, EmotionSelectorRunnable, SummaryRunnable, handle_summary_confirmation
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+from flask_migrate import Migrate
 from langchain_openai import ChatOpenAI
 from langchain_core.chat_history import InMemoryChatMessageHistory
+from runnables import CrisisRunnable, EmotionSelectorRunnable, SummaryRunnable, handle_summary_confirmation
 import os
 from dotenv import load_dotenv
 import secrets
@@ -12,9 +15,42 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://nathanpaek:postgres@localhost:5432/reappraisal_bot'
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 
-llm = ChatOpenAI(
+class Conversations(db.Model):
+    __tablename__ = 'conversations'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    value1 = db.Column(db.String())
+    value2 = db.Column(db.String())
+    value3 = db.Column(db.String())
+    value4 = db.Column(db.String())
+    value5 = db.Column(db.String())
+    value6 = db.Column(db.String())
+    value7 = db.Column(db.String())
+    value8 = db.Column(db.String())
+    value9 = db.Column(db.String())
+    value10 = db.Column(db.String())
+
+    issue = db.Column(db.String())
+    issue_summary = db.Column(db.String())
+    
+    emotion1 = db.Column(db.String())
+    emotion2 = db.Column(db.String())
+    emotion3 = db.Column(db.String())
+
+    created = db.Column(db.DateTime, default=datetime.utcnow)
+    updated = db.Column(db.DateTime)
+
+    def __init__(self, values):
+        self.values = values
+
+
+llm = ChatOpenAI( 
     model="gpt-4o-mini",
     temperature=0.7,
     max_tokens=256,
