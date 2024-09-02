@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="/static/styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Interaction</title>
+</head>
+<body>
+    <div id="chat-container">
+        <div id="messages">
+            <div class="message bot-message">
+                <p> Hello, I am the Reappraisal Bot. Please tell me about an issue in your life that is currently bothering you and that is in the domain of career/education. This could be an issue related to job searching, career advancement opportunities, work-life balance, workplace environment and culture, job satisfaction, salary and benefits, remote work challenges, job security, or any other other issues.<br>
+
+                <br>Note: I am unable to help with any issues related to suicide, self-harm, or physical or sexual violence. For issues like these, please seek the help of a professional human.
+                </p>    
+            </div>
+        </div>
+        <div id="emotion-buttons" style="display: none;">
+            <p>Choose the three emotions that best describe how you're feeling:</p>
+            <div id="emotion-container"></div>
+            <button id="other-button" onclick="showOtherInput()">other</button>
+            <div id="other-input-container" style="display: none;">
+                <input type="text" id="other-input" placeholder="Add your emotion here" />
+                <button onclick="addOtherEmotion()">Add</button>
+            </div>
+            <p id="selected-emotions"></p>
+            <button onclick="submitEmotions()">Submit Emotions</button>
+        </div>
+        <div id="confirm-summary-buttons" style="display: none;">
+            <button onclick="confirmSummary('yes')">Yes</button>
+            <button onclick="confirmSummary('no')">No</button>
+        </div>
+        <input type="text" id="user-input" placeholder="Type here" />
+        <button onclick="sendMessage()">Submit</button>
+    </div>
+
+    <div id="reappraisal-ratings" style="display: none;">
+        <p>On a scale of 1 to 10, how effective is this reappraisal?</p>
+        <input type="range" min="0" max="10" value="5" id="effectiveness-slider" />
+        <span id="effectiveness-value">5</span>
+        <p>On a scale of 1 to 10, how believable is this reappraisal?</p>
+        <input type="range" min="0" max="10" value="5" id="believability-slider" />
+        <span id="believability-value">5</span>
+        <button onclick="submitReappraisalRatings()">Submit Ratings</button>
+    </div>
+
+    <script>
+        let currentAction = 'start';
+
+        function sendMessage() {
+            const userInput = document.getElementById('user-input').value;
+            document.getElementById('user-input').value = '';
+
+            if (!userInput.trim()) {
+                alert("Please enter a message.");
+                return;
+            }
+
+            addMessageToChat('User', userInput);
+
+            let payload = {
+                action: currentAction,
+                user_input: userInput
+            };
+
+            if (currentAction === 'confirm_summary' || currentAction === 'edit_summary') {
+                payload.user_selection = userInput;
+            }
+
+            fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                handleResponse(data);
+            })
+            .catch(error => console.error('Error:', error));
+
+            document.getElementById('user-input').focus();
+        }
+
+        document.getElementById('user-input').addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        function handleResponse(data) {
+            if (data.message === "crisis detected") {
+                addMessageToChat('Bot', data.crisis_message);
+                currentAction = 'final_step';
+                // hide buttons
+                document.getElementById('user-input').style.display = 'none';
+                document.querySelector('button[onclick="sendMessage()"]').style.display = 'none';
+                return;
+            }
+            if (currentAction === 'start') {
+                currentAction = 'select_emotions';
+                addMessageToChat('Bot', data.message);
+
+                document.getElementById('user-input').style.display = 'none';
+                document.querySelector('button[onclick="sendMessage()"]').style.display = 'none';
+                document.getElementById('emotion-buttons').style.display = 'block';
+
+            } else if (currentAction === 'select_emotions') {
+                currentAction = 'provide_reason';
+                addMessageToChat('Bot', data.message);
+
+                document.getElementById('emotion-buttons').style.display = 'none';
+                document.getElementById('user-input').style.display = 'block';
+                document.querySelector('button[onclick="sendMessage()"]').style.display = 'block';
+
+            } else if (currentAction === 'provide_reason') {
+                if (data.emotion_index !== undefined) {
+                    addMessageToChat('Bot', data.message);
+                } else if (data.summary) {
+                    addMessageToChat('Bot', data.summary);
+                    currentAction = 'confirm_summary';
+                    // addMessageToChat('Bot', data.message);
+
+                    document.getElementById('confirm-summary-buttons').style.display = 'block';
+                    document.getElementById('user-input').style.display = 'none';
+                    document.querySelector('button[onclick="sendMessage()"]').style.display = 'none';
+                }
+
+            } else if (currentAction === 'confirm_summary' || currentAction === 'edit_summary') {
+                if (data.next_action === 'edit_summary') {
+                    currentAction = 'edit_summary';
+                    addMessageToChat('Bot', data.message);
+
+                    //document.getElementById('confirm-summary-buttons').style.display = 'none';
+                    document.getElementById('user-input').style.display = 'none';
+                    document.querySelector('button[onclick="sendMessage()"]').style.display = 'block';
+                } else if (data.message && data.reappraisal_number) {
+                    if (data.disclaimer) {
+                        addMessageToChat('Bot', data.disclaimer);
+                    }
+                    displayReappraisal(data.reappraisal_number, data.message);
+                    currentAction = 'rate_reappraisal';
+                    document.querySelector('button[onclick="sendMessage()"]').style.display = 'none';
+                }
+            } else if (currentAction === 'rate_reappraisal') {
+                if (data.next_action === 'rate_reappraisal') {
+                    displayReappraisal(data.reappraisal_number, data.message);
+                } else {
+                    addMessageToChat('Bot', data.message);
+
+                    document.getElementById('reappraisal-ratings').style.display = 'none';
+                    document.getElementById('user-input').style.display = 'none';
+                    document.getElementById('submit-button').style.display = 'block';
+                    document.querySelector('button[onclick="sendMessage()"]').style.display = 'none';
+                }
+            }
+        }
+
+        const emotions = [
+            "stressed", "worried", "overwhelmed", "concerned", "annoyed", "irritated",
+            "frustrated", "embarrassed", "guilty", "ashamed", "disappointed", "hurt", "lonely", "sad",
+            "regretful", "confused", "surprised", "peaceful", "relieved", "content",
+            "inspired", "excited", "hopeful", "grateful", "proud"
+        ];
+
+        let selectedEmotions = [];
+
+        function toggleEmotion(emotion) {
+            const index = selectedEmotions.indexOf(emotion);
+            if (index > -1) {
+                selectedEmotions.splice(index, 1);
+                event.target.style.backgroundColor = '';
+            } else if (selectedEmotions.length < 3) {
+                selectedEmotions.push(emotion);
+                event.target.style.backgroundColor = 'lightblue';
+            }
+            updateSelectedEmotions();
+            updateOtherButtonState();
+        }
+
+        function updateOtherButtonState() {
+            const otherButton = document.getElementById('other-button');
+            if (selectedEmotions.length >= 3) {
+                otherButton.disabled = true;
+            } else {
+                otherButton.disabled = false;
+            }
+        }
+
+
+        function showOtherInput() {
+            document.getElementById('other-input-container').style.display = 'block';
+        }
+
+        function addOtherEmotion() {
+            const otherEmotion = document.getElementById('other-input').value.trim();
+            if (otherEmotion && selectedEmotions.length < 3) {
+                selectedEmotions.push(otherEmotion);
+                updateSelectedEmotions();
+                document.getElementById('other-input').value = ''; // Clear the input field
+                document.getElementById('other-input-container').style.display = 'none';
+                updateOtherButtonState(); 
+            } else {
+                alert("Please enter a valid emotion or ensure you've selected less than 3 emotions.");
+            }
+        }
+
+
+        function formatEmotions(emotions) {
+            const emotionsCopy = [...emotions];
+            if (emotionsCopy.length === 1) {
+                return emotionsCopy[0];
+            } else if (emotionsCopy.length === 2) {
+                return emotionsCopy.join(' and ');
+            } else {
+                const lastEmotion = emotionsCopy.pop();
+                return `${emotionsCopy.join(', ')}, and ${lastEmotion}`;
+            }
+        }
+
+        function updateSelectedEmotions() {
+            document.getElementById('selected-emotions').textContent = `Selected: ${selectedEmotions.join(', ')}`;
+        }
+
+        function submitEmotions() {
+            if (selectedEmotions.length === 0) {
+                alert("Please select at least one emotion.");
+                return;
+            }
+
+            const formattedEmotions = formatEmotions(selectedEmotions);
+            addMessageToChat('User', `I feel ${formattedEmotions}.`);
+
+            let payload = {
+                action: 'select_emotions',
+                selected_emotions: selectedEmotions  
+            };
+            fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                handleResponse(data);
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function confirmSummary(response) {
+            let payload = {
+                action: 'confirm_summary',
+                user_selection: response
+            };
+
+            fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                handleResponse(data);
+                document.getElementById('confirm-summary-buttons').style.display = 'none';
+                if (response.toLowerCase() === 'yes') {
+                    document.getElementById('user-input').style.display = 'none';
+                    document.querySelector('button[onclick="sendMessage()"]').style.display = 'none';
+                } else {
+                    document.getElementById('user-input').style.display = 'block';
+                    document.querySelector('button[onclick="sendMessage()"]').style.display = 'block';
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+
+        function displayReappraisal(number, message) {
+            /* addMessageToChat('Bot', message);
+            
+            document.getElementById('reappraisal-ratings').style.display = 'block';
+            
+            document.getElementById('user-input').style.display = 'none';
+            document.getElementById('submit-button').style.display = 'none'; */
+
+            addMessageToChat('Bot', message);
+    
+            document.getElementById('user-input').style.display = 'none';
+            document.getElementById('reappraisal-ratings').style.display = 'block';
+
+            // reset slider values
+            document.getElementById('effectiveness-slider').value = 5;
+            document.getElementById('believability-slider').value = 5;
+            document.getElementById('effectiveness-value').textContent = '5';
+            document.getElementById('believability-value').textContent = '5';
+        }
+
+        function submitReappraisalRatings() {
+            const effectiveness = document.getElementById('effectiveness-slider').value;
+            const believability = document.getElementById('believability-slider').value;
+
+            // addMessageToChat('User', `Effectiveness: ${effectiveness}, Believability: ${believability}`);
+
+            let payload = {
+                action: 'rate_reappraisal',
+                effectiveness_rating: effectiveness,
+                believability_rating: believability
+            };
+
+            fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                handleResponse(data);
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        /* function addMessageToChat(sender, message) {
+            const messageContainer = document.getElementById('messages');
+            const messageElement = document.createElement('p');
+            messageElement.innerHTML = `<strong>${sender}:</strong> ${message}`;
+            messageContainer.appendChild(messageElement);
+        } */
+
+        function addMessageToChat(sender, message) {
+            const messageContainer = document.getElementById('messages');
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message ' + (sender === 'User' ? 'user-message' : 'bot-message');
+            messageElement.innerHTML = `<strong>${sender}:</strong> ${message}`;
+            messageContainer.appendChild(messageElement);
+            messageContainer.scrollTop = messageContainer.scrollHeight;
+        }
+
+        document.getElementById('effectiveness-slider').oninput = function() {
+            document.getElementById('effectiveness-value').textContent = this.value;
+        };
+
+        document.getElementById('believability-slider').oninput = function() {
+            document.getElementById('believability-value').textContent = this.value;
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const emotionContainer = document.getElementById('emotion-container');
+            emotions.forEach(emotion => {
+                const button = document.createElement('button');
+                button.textContent = emotion;
+                button.onclick = () => toggleEmotion(emotion);
+                emotionContainer.appendChild(button);
+            });
+            updateOtherButtonState();
+        });
+    </script>
+</body>
+</html>
