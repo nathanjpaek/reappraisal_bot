@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from urllib.parse import parse_qs
 import secrets
 import random
+import json
 
 # I am constantly feeling overwhelmed at work because of the high expectations and the pressure to perform. This has been affecting my mental health and causing me stress every day.
 
@@ -19,8 +20,11 @@ load_dotenv()
 
 
 app = Flask(__name__, static_url_path='/static')
-app.secret_key = secrets.token_hex(16)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://nathanpaek:postgres@localhost:5432/reappraisal_bot'
+app.secret_key = os.environ["SECRET_KEY"]
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://nathanpaek:vbriscool@db:5432/reappraisal_bot'
+
+
+# 'postgresql://nathanpaek:postgres@localhost:5432/reappraisal_bot'
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
@@ -28,7 +32,7 @@ migrate = Migrate(app, db)
 class Conversations(db.Model):
     __tablename__ = 'conversations'
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
 
     v1 = db.Column(db.String())
     v2 = db.Column(db.String())
@@ -58,9 +62,13 @@ class Conversations(db.Model):
     reason2 = db.Column(db.String())
     reason3 = db.Column(db.String())
 
-    reappraisal1 = db.Column(db.String())
-    reappraisal2 = db.Column(db.String())
-    reappraisal3 = db.Column(db.String())
+    reappraisal_high = db.Column(db.String())
+    reappraisal_low = db.Column(db.String())
+    reappraisal_general = db.Column(db.String())
+
+    reappraisal_high_value = db.Column(db.String())
+    reappraisal_low_value = db.Column(db.String())
+    reappraisal_general_value = db.Column(db.String())
 
     r1q1 = db.Column(db.String())
     r1q2 = db.Column(db.String())
@@ -98,7 +106,7 @@ class Conversations(db.Model):
 class Messages(db.Model):
     __tablename__ = 'messages'
 
-    msg_id = db.Column(db.Integer, primary_key=True)
+    msg_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     convo_id = db.Column(db.Integer, db.ForeignKey('conversations.id'), nullable=False)
     sent_timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     source = db.Column(db.String(), nullable=False)
@@ -115,7 +123,7 @@ class Messages(db.Model):
 llm = ChatOpenAI( 
     model="gpt-4o-mini",
     temperature=0.7,
-    max_tokens=256,
+    max_tokens=512,
     api_key=os.environ["OPENAI_API_KEY"],
 )
 crisis_runnable = CrisisRunnable(model=llm)
@@ -149,10 +157,18 @@ def index():
     # value is score
 
     # PARSE QUERY STRING HERE
-    # parsed_data = parse_qs(request.query_string)
-    # parsed_values = {key: int(value[0]) if value else None for key, value in parsed_data.items()}
-    # session['parsed_values'] = parsed_values
-    session['parsed_values'] = {
+    parsed_data = parse_qs(request.query_string.decode('utf-8'))
+    parsed_values = {key: int(value[0]) if value else None for key, value in parsed_data.items()}
+    session['parsed_values'] = parsed_values
+   
+    session['reappraisal_count'] = 0 # how many reappraisals shown to user
+    return send_from_directory('templates', 'index.html')
+
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    print("RECEIVED CHAT REQUEST")
+    """session['parsed_values'] = {
         'v1': 2,
         'v2': 4,
         'v3': 8,
@@ -170,13 +186,18 @@ def index():
         'v15': 11,
         'v16': 16
     }
-    session['reappraisal_count'] = 0
-    return send_from_directory('templates', 'index.html')
+    session['reappraisal_count'] = 0"""
+    # session['convo_id'] = None
+
+    # MAKE SURE INDEX ROUTE COMES BEFORE CHAT ROUTE
+    #if 'parsed_values' not in session:
+    #    return redirect(url_for('index'))
 
 
-@app.route('/chat', methods=['POST'])
-def chat():
     data = request.json
+
+    print(f"REQUEST DATA: {data}")
+
     action = data.get('action', '')
     emotion_index = data.get('emotion_index', 0)
     
@@ -201,6 +222,8 @@ def chat():
         db.session.add(conversation)
         db.session.commit()
         session['convo_id'] = conversation.id
+        with open ('myfile.json', 'w') as json_file:
+            json.dump(session, json_file)
         conversation.issue = issue
 
         user_message = Messages(convo_id=conversation.id, source='human', message=issue)
@@ -221,7 +244,7 @@ def chat():
             db.session.commit()
             ##### DATABASE #####
             return jsonify({"message": "crisis detected", "crisis_message": crisis_message, "next_action": "final_step"}), 200
-        return jsonify({"message": "Choose the three emotions that best describe how you're feeling:"}), 200
+        return jsonify({"message": "Choose up to three emotions that best describe how you're feeling."}), 200
 
 
     if action == 'select_emotions':
@@ -247,11 +270,13 @@ def chat():
         session['emotions_data'] = {}
         session['current_emotion_index'] = 0
 
-        return jsonify({"message": f"Why are you feeling {selected_emotions[0]}?", "emotion_index": 0}), 200
+        return jsonify({"message": f"What makes you feel {selected_emotions[0]}?", "emotion_index": 0}), 200
         # return jsonify({"message": f"Why are you feeling {', '.join(selected_emotions)}?"}), 200
 
 
     elif action == 'provide_reason':
+        with open ('myfile.json', 'w') as json_file:
+            json.dump(session, json_file)
         conversation = Conversations.query.get(session['convo_id'])
 
         selected_emotions = session.get('selected_emotions', [])
@@ -312,7 +337,7 @@ def chat():
         if current_emotion_index < len(selected_emotions):
             print(f"CURRENT EMOTIONS INDEX: {current_emotion_index}")
             next_emotion = selected_emotions[current_emotion_index]
-            return jsonify({"message": f"Why are you feeling {next_emotion}?", "emotion_index": current_emotion_index}), 200
+            return jsonify({"message": f"What makes you feel {next_emotion}?", "emotion_index": current_emotion_index}), 200
         else:
             input_data = {
                 "issue": session.get("issue", ""),
@@ -368,7 +393,8 @@ def chat():
 
             return generate_reappraisals()
         else:
-            return jsonify({"message": "please edit the summary (editable text box)", "next_action": "edit_summary"}), 200
+
+            return jsonify({"message": "Please edit the summary below:", "next_action": "edit_summary", "summary": session['summary'].split("Does this summary adequately", 1)[0]}), 200
 
     elif action == 'edit_summary':
         edited_summary = data.get('user_input', '').strip()
@@ -424,87 +450,8 @@ def chat():
             return generate_reappraisals()
         else:
             return jsonify({"message": "Thanks for chatting! I hope that the reappraisals helped.", "next_action": "final_step"}), 200
-
-    elif action == 'submit_ratings':
-        ratings = data.get('ratings', [])
-
-
-        ##### DATABASE #####
-
-        conversation = Conversations.query.get(session['convo_id'])
-        conversation.r1q1 = ratings[0] 
-        conversation.r2q1 = ratings[1] 
-        conversation.r3q1 = ratings[2]
-        db.session.commit()
-
-        ##### DATABASE #####
-
-
-        return jsonify({
-            "message": "end",
-            "next_action": "final_step"
-        }), 200
-
     else:
         return jsonify({"message": "Invalid action specified."}), 400
-
-
-"""def generate_reappraisals():
-    final_summary = session.get('summary', '')
-    reappraisal_count = session.get('reappraisal_count', 0)
-    
-    if reappraisal_count == 0:
-        reappraisal_order = random.sample([1, 2, 3], 3)
-        session['reappraisal_order'] = reappraisal_order
-        session['reappraisal_count'] = 1
-    else:
-        reappraisal_order = session.get('reappraisal_order', [])
-        session['reappraisal_count'] += 1
-
-    if reappraisal_count >= 3:
-        return jsonify({"message": "end", "next_action": "final_step"}), 200
-
-    reappraisal_number = reappraisal_order[reappraisal_count]
-
-    if reappraisal_number == 1:
-        min_key = min(session['parsed_values'], key=session['parsed_values'].get)
-        value = value_mapping.get(min_key, "")
-    elif reappraisal_number == 2:
-        max_key = max(session['parsed_values'], key=session['parsed_values'].get)
-        value = value_mapping.get(max_key, "")
-    elif reappraisal_number == 3:
-        value = ""  # VALUE AGNOSTIC
-    
-    reappraisal = reappraisal_runnable({
-        "issue": final_summary,
-        "value": value
-    })
-
-
-    ##### DATABASE #####
-
-    conversation = Conversations.query.get(session['convo_id'])
-    setattr(conversation, f'reappraisal{reappraisal_number}', reappraisal)
-    db.session.commit()
-
-    ##### DATABASE #####
-
-
-    if reappraisal_count == 0:
-        return jsonify({
-            "disclaimer": "I will now give you three reappraisals. Disclaimer: These alternate perspectives were generated by an artificial intelligence bot powered by GPT-4. We cannot guarantee that these perspectives are helpful or true perspectives and we encourage you to use your own judgement before accepting any alternate perspective offered in the course of this study.",
-            "message": f"Reappraisal {reappraisal_count + 1} of 3, with reappraisal number {reappraisal_number} and value {value}: {reappraisal}",
-            "reappraisal_number": reappraisal_number,
-            "reappraisal_count": reappraisal_count + 1,
-            "next_action": "rate_reappraisal"
-        }), 200
-    else:
-        return jsonify({
-            "message": f"Reappraisal {reappraisal_count + 1} of 3, with reappraisal number {reappraisal_number} and value {value}: {reappraisal}",
-            "reappraisal_number": reappraisal_number,
-            "reappraisal_count": reappraisal_count + 1,
-            "next_action": "rate_reappraisal"
-        }), 200"""
 
 
 def generate_reappraisals():
@@ -542,7 +489,15 @@ def generate_reappraisals():
 
     ##### DATABASE #####
     conversation = Conversations.query.get(session['convo_id'])
-    setattr(conversation, f'reappraisal{reappraisal_number}', reappraisal)
+    if reappraisal_number == 1:
+        conversation.reappraisal_high = reappraisal
+        conversation.reappraisal_high_value = value
+    elif reappraisal_number == 2:
+        conversation.reappraisal_low = reappraisal
+        conversation.reappraisal_low_value = value
+    elif reappraisal_number == 3:
+        conversation.reappraisal_general = reappraisal
+        conversation.reappraisal_general_value = value
     db.session.commit()
     ##### DATABASE #####
 
@@ -555,7 +510,7 @@ def generate_reappraisals():
 
     return jsonify({
         "disclaimer": disclaimer,
-        "message": f"Reappraisal {reappraisal_count + 1} of 3, with reappraisal number {reappraisal_number} and value {value}: {reappraisal}",
+        "message": f"Reappraisal {reappraisal_count + 1} of 3: {reappraisal}",
         "reappraisal_number": reappraisal_number,
         "reappraisal_count": reappraisal_count + 1,
         "next_action": "rate_reappraisal"
@@ -563,4 +518,5 @@ def generate_reappraisals():
 
 
 if __name__ == '__main__':
+
     app.run(debug=True)

@@ -1,3 +1,4 @@
+/* Global Styles */
 body {
     font-family: Arial, sans-serif;
     line-height: 1.6;
@@ -8,6 +9,7 @@ body {
     background-color: #f4f4f4;
 }
 
+/* Chat Container */
 #chat-container {
     background-color: #fff;
     border-radius: 8px;
@@ -17,6 +19,7 @@ body {
     margin: 0 auto; 
 }
 
+/* Messages Area */
 #messages {
     max-height: 600px; 
     overflow-y: auto;
@@ -24,38 +27,91 @@ body {
     padding: 10px;
     border: 1px solid #ddd;
     border-radius: 4px;
-    display: flex;
-    flex-direction: column;
 }
 
+/* Message Wrapper */
+.message-wrapper {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.bot-message-wrapper {
+    justify-content: flex-start;
+}
+
+.user-message-wrapper {
+    justify-content: flex-end;
+}
+
+/* Message Icons */
+.message-wrapper img {
+    width: 35px;
+    height: 35px;
+    flex-shrink: 0;
+}
+
+.bot-message-wrapper img {
+    margin-right: 10px;
+}
+
+.user-message-wrapper img {
+    margin-left: 10px;
+    order: 1;
+}
+
+/* Message Bubbles */
 .message {
-    max-width: 80%; 
+    max-width: calc(100% - 60px);
     padding: 10px;
     border-radius: 15px;
-    margin-bottom: 10px;
     line-height: 1.5;
+    border: none;
 }
 
 .bot-message {
     background-color: #e0e0e0;
     color: #000;
-    align-self: flex-start;
-    text-align: left;
 }
 
 .user-message {
-    background-color: #4CAF50;
+    background-color: rgb(116, 154, 240);
     color: white;
-    align-self: flex-end;
-    text-align: right;
 }
 
-#emotion-buttons, #confirm-summary-buttons, #reappraisal-ratings {
-    margin-bottom: 20px;
+/* Input Area */
+#user-input {
+    width: calc(100% - 22px);
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    color: rgb(0, 0, 0);
+    box-sizing: border-box;
 }
 
+/* Textarea for Summary Edit */
+textarea#summary-edit {
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    color: #333;
+    width: calc(100% - 22px);
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    resize: vertical;
+    min-height: 100px;
+    box-sizing: border-box;
+}
+
+/* Buttons */
 button {
-    background-color: #4CAF50;
+    background-color: rgb(157, 190, 203);
     border: none;
     color: white;
     padding: 10px 20px;
@@ -70,26 +126,18 @@ button {
 }
 
 button:hover {
-    background-color: #45a049;
+    background-color: rgb(182, 215, 228);
 }
 
-input[type="text"] {
-    width: calc(100% - 22px);
-    padding: 10px;
-    margin-bottom: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-input[type="range"] {
-    width: 100%;
-    margin: 10px 0;
+/* Emotion Buttons */
+#emotion-buttons, #confirm-summary-buttons, #reappraisal-ratings {
+    margin-bottom: 20px;
 }
 
 #emotion-container button,
 #other-button,
 #other-input-container button {
-    background-color: #008CBA;
+    background-color: rgb(116, 154, 240);
     margin: 2px;
     padding: 5px 10px;
     font-size: 14px;
@@ -103,7 +151,7 @@ input[type="range"] {
 #emotion-container button:hover,
 #other-button:hover,
 #other-input-container button:hover {
-    background-color: #007B9A;
+    background-color: rgb(141, 179, 255);
 }
 
 #other-input {
@@ -126,17 +174,130 @@ input[type="range"] {
     font-style: italic;
 }
 
+
+/* Reappraisal Ratings Container */
+#reappraisal-ratings {
+    width: 86.7%; /* Make it as wide as the chat container */
+    padding: 20px; /* Match the padding of the chat container */
+    box-sizing: border-box;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    font-size: 16px;
+    font-family: Arial, sans-serif;
+    line-height: 1.5;
+    background-color: #fff; /* Match the main chat box background */
+    border-radius: 8px; /* Match the chat container's border radius */
+    margin: 0 auto; /* Center it within the chat container */
+    position: relative; /* Enable positioning */
+    top: -13px; /* Move it up by 10px to create overlap */
+    z-index: 1; /* Ensure it overlaps on top of other elements */
+}
+
+#reappraisal-ratings::before {
+    content: "";
+    position: absolute;
+    top: -7px; /* Adjust this value based on your needs */
+    left: 0;
+    right: 0;
+    height: 10px; /* Same as the top offset */
+    background-color: #fff; /* Same as the container background */
+    border-top-left-radius: 8px; /* Match the border radius of the container */
+    border-top-right-radius: 8px; /* Match the border radius of the container */
+    z-index: 2; /* Ensure it is above the shadow */
+}
+
+
+/* Slider Container */
+.slider-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+/* Slider Group */
+.slider-group {
+    width: 48%; /* Adjusted to fit two sliders side by side in the container */
+    margin-bottom: 15px;
+}
+
+/* Slider Styles */
+input[type="range"] {
+    width: 100%; /* Use the full width of the slider group */
+    -webkit-appearance: none;
+    background: transparent;
+    margin: 10px 0;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 20px;
+    width: 20px;
+    border-radius: 50%;
+    background: rgb(116, 154, 240);
+    cursor: pointer;
+    margin-top: -7px;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 6px;
+    background: #ddd;
+    border-radius: 3px;
+}
+
+/* Slider Value Display */
+#effectiveness-value,
+#believability-value {
+    display: inline-block;
+    width: 30px;
+    text-align: center;
+    margin-left: 10px;
+}
+
+/* Slider Labels */
+#reappraisal-ratings p {
+    margin: 5px 0;
+    width: 100%;
+    text-align: left;
+}
+
+/* Submit Button for Ratings */
+#reappraisal-ratings button {
+    display: block;
+    margin: 20px auto 0;
+    padding: 10px 20px;
+    font-size: 16px;
+    background-color: rgb(157, 190, 203);
+    border: none;
+    color: white;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+}
+
+#reappraisal-ratings button:hover {
+    background-color: rgb(182, 215, 228);
+}
+
+/* Responsive Design */
+@media (min-width: 768px) {
+    .slider-container {
+        flex-direction: row;
+        justify-content: space-between;
+    }
+    
+    .slider-group {
+        width: 48%; /* Adjusted for better fit */
+    }
+}
+
+/* Responsive Design */
 @media (max-width: 800px) {
-    body {
-        padding: 10px;
+    #reappraisal-ratings {
+        font-size: 16px;
     }
     
-    #chat-container {
-        padding: 10px;
-    }
-    
-    button {
-        padding: 8px 16px;
-        font-size: 14px;
+    input[type="range"] {
+        width: 100%;
     }
 }
